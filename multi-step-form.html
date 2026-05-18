@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multi-Step Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0ede8;
+      --card: #ffffff;
+      --accent: #2d6a4f;
+      --accent-light: #d8f3dc;
+      --accent-dark: #1b4332;
+      --text: #1c1c1c;
+      --muted: #6b6b6b;
+      --border: #ddd;
+      --error: #c0392b;
+      --error-bg: #fdf0ef;
+      --success: #2d6a4f;
+      --step-done: #2d6a4f;
+      --step-active: #2d6a4f;
+      --step-todo: #c9c9c9;
+      --radius: 14px;
+      --shadow: 0 8px 40px rgba(0,0,0,0.10);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      color: var(--text);
+    }
+
+    .form-wrapper {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      color: var(--accent-dark);
+      margin-bottom: 0.25rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 2rem;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-track {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .progress-line-bg {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      right: 20px;
+      height: 3px;
+      background: var(--step-todo);
+      transform: translateY(-50%);
+      z-index: 0;
+      border-radius: 3px;
+    }
+
+    .progress-line-fill {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      height: 3px;
+      background: var(--accent);
+      transform: translateY(-50%);
+      z-index: 1;
+      border-radius: 3px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-dot {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--card);
+      border: 3px solid var(--step-todo);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: all 0.4s ease;
+    }
+
+    .dot-circle .check { display: none; font-size: 1rem; }
+
+    .step-dot.done .dot-circle {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .step-dot.done .dot-circle .num { display: none; }
+    .step-dot.done .dot-circle .check { display: block; }
+
+    .step-dot.active .dot-circle {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 5px rgba(45,106,79,0.15);
+    }
+
+    .dot-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .step-dot.active .dot-label,
+    .step-dot.done .dot-label { color: var(--accent-dark); }
+
+    /* ── CARD ── */
+    .form-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 2.2rem 2.4rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── AUTOSAVE BADGE ── */
+    .autosave-badge {
+      position: absolute;
+      top: 1rem;
+      right: 1.2rem;
+      font-size: 0.72rem;
+      color: var(--success);
+      background: var(--accent-light);
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .autosave-badge.show { opacity: 1; }
+
+    /* ── STEP PANELS ── */
+    .step-panel {
+      display: none;
+      animation: slideIn 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-panel.active { display: block; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes slideBack {
+      from { opacity: 0; transform: translateX(-30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .step-panel.slide-back { animation: slideBack 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .step-heading {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      color: var(--accent-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .step-desc {
+      font-size: 0.87rem;
+      color: var(--muted);
+      margin-bottom: 1.8rem;
+    }
+
+    /* ── FIELDS ── */
+    .field-group { margin-bottom: 1.2rem; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    label .req { color: var(--error); margin-left: 2px; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      background: #fafafa;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(45,106,79,0.12);
+    }
+
+    input.error, select.error, textarea.error {
+      border-color: var(--error);
+      background: var(--error-bg);
+    }
+
+    .error-msg {
+      font-size: 0.78rem;
+      color: var(--error);
+      margin-top: 5px;
+      display: none;
+    }
+
+    .error-msg.show { display: block; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    textarea { resize: vertical; min-height: 90px; }
+
+    /* ── RADIO CARDS ── */
+    .radio-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+
+    .radio-card input { display: none; }
+
+    .radio-card label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      background: #fafafa;
+      margin: 0;
+    }
+
+    .radio-card input:checked + label {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent-dark);
+    }
+
+    .radio-card label .icon { font-size: 1.2rem; }
+
+    /* ── SUMMARY ── */
+    .summary-block {
+      background: #f9f9f7;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .summary-block h4 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.8rem;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      padding: 4px 0;
+      border-bottom: 1px dashed #e8e8e8;
+    }
+
+    .summary-row:last-child { border-bottom: none; }
+    .summary-row span:first-child { color: var(--muted); }
+    .summary-row span:last-child { font-weight: 500; }
+
+    /* ── BUTTONS ── */
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 2rem;
+      gap: 1rem;
+    }
+
+    .btn {
+      padding: 0.7rem 1.8rem;
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-prev {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+    }
+
+    .btn-prev:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .btn-next {
+      background: var(--accent);
+      color: #fff;
+      margin-left: auto;
+    }
+
+    .btn-next:hover { background: var(--accent-dark); transform: translateY(-1px); }
+    .btn-next:active { transform: translateY(0); }
+
+    .btn-submit {
+      background: var(--accent-dark);
+      color: #fff;
+      width: 100%;
+      padding: 0.85rem;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      transition: all 0.2s;
+      margin-top: 1.5rem;
+    }
+
+    .btn-submit:hover { background: var(--accent); transform: translateY(-1px); }
+
+    /* ── SUCCESS ── */
+    .success-screen {
+      display: none;
+      text-align: center;
+      padding: 2rem 0;
+    }
+
+    .success-screen.show { display: block; animation: slideIn 0.5s ease; }
+
+    .success-icon {
+      width: 70px;
+      height: 70px;
+      background: var(--accent-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      font-size: 2rem;
+    }
+
+    .success-screen h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      color: var(--accent-dark);
+      margin-bottom: 0.5rem;
+    }
+
+    .success-screen p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-restart {
+      padding: 0.65rem 1.6rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-restart:hover { background: var(--accent-dark); }
+
+    /* ── STRENGTH METER ── */
+    .strength-meter { display: flex; gap: 4px; margin-top: 6px; }
+    .strength-bar {
+      height: 4px;
+      flex: 1;
+      border-radius: 3px;
+      background: #e0e0e0;
+      transition: background 0.3s;
+    }
+
+    .strength-bar.weak   { background: #e74c3c; }
+    .strength-bar.medium { background: #f39c12; }
+    .strength-bar.strong { background: var(--accent); }
+
+    .strength-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="form-wrapper">
+  <h1>Get Started</h1>
+  <p class="subtitle">Complete each step to create your account</p>
+
+  <!-- PROGRESS TRACK -->
+  <div class="progress-track" id="progressTrack">
+    <div class="progress-line-bg"></div>
+    <div class="progress-line-fill" id="progressFill"></div>
+
+    <div class="step-dot active" data-step="1">
+      <div class="dot-circle">
+        <span class="num">1</span>
+        <span class="check">✓</span>
+      </div>
+      <span class="dot-label">Personal</span>
+    </div>
+    <div class="step-dot" data-step="2">
+      <div class="dot-circle">
+        <span class="num">2</span>
+        <span class="check">✓</span>
+      </div>
+      <span class="dot-label">Account</span>
+    </div>
+    <div class="step-dot" data-step="3">
+      <div class="dot-circle">
+        <span class="num">3</span>
+        <span class="check">✓</span>
+      </div>
+      <span class="dot-label">Preferences</span>
+    </div>
+    <div class="step-dot" data-step="4">
+      <div class="dot-circle">
+        <span class="num">4</span>
+        <span class="check">✓</span>
+      </div>
+      <span class="dot-label">Review</span>
+    </div>
+  </div>
+
+  <!-- CARD -->
+  <div class="form-card" id="formCard">
+    <div class="autosave-badge" id="autosaveBadge">✓ Autosaved</div>
+
+    <!-- STEP 1: Personal Info -->
+    <div class="step-panel active" id="step1">
+      <div class="step-heading">Personal Info</div>
+      <p class="step-desc">Tell us a little about yourself.</p>
+
+      <div class="row">
+        <div class="field-group">
+          <label for="firstName">First Name <span class="req">*</span></label>
+          <input type="text" id="firstName" placeholder="John" />
+          <div class="error-msg" id="err-firstName">First name is required.</div>
+        </div>
+        <div class="field-group">
+          <label for="lastName">Last Name <span class="req">*</span></label>
+          <input type="text" id="lastName" placeholder="Doe" />
+          <div class="error-msg" id="err-lastName">Last name is required.</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="email">Email Address <span class="req">*</span></label>
+        <input type="email" id="email" placeholder="john@example.com" />
+        <div class="error-msg" id="err-email">Enter a valid email address.</div>
+      </div>
+
+      <div class="field-group">
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" placeholder="+92 300 1234567" />
+      </div>
+
+      <div class="field-group">
+        <label for="dob">Date of Birth <span class="req">*</span></label>
+        <input type="date" id="dob" />
+        <div class="error-msg" id="err-dob">Please select your date of birth.</div>
+      </div>
+
+      <div class="btn-row">
+        <span></span>
+        <button class="btn btn-next" onclick="nextStep(1)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Account Setup -->
+    <div class="step-panel" id="step2">
+      <div class="step-heading">Account Setup</div>
+      <p class="step-desc">Choose your username and a strong password.</p>
+
+      <div class="field-group">
+        <label for="username">Username <span class="req">*</span></label>
+        <input type="text" id="username" placeholder="john_doe_99" />
+        <div class="error-msg" id="err-username">Username must be at least 4 characters.</div>
+      </div>
+
+      <div class="field-group">
+        <label for="password">Password <span class="req">*</span></label>
+        <input type="password" id="password" placeholder="Min. 8 characters" oninput="checkStrength(this.value)" />
+        <div class="strength-meter">
+          <div class="strength-bar" id="sb1"></div>
+          <div class="strength-bar" id="sb2"></div>
+          <div class="strength-bar" id="sb3"></div>
+          <div class="strength-bar" id="sb4"></div>
+        </div>
+        <div class="strength-label" id="strengthLabel">Enter a password</div>
+        <div class="error-msg" id="err-password">Password must be at least 8 characters.</div>
+      </div>
+
+      <div class="field-group">
+        <label for="confirmPassword">Confirm Password <span class="req">*</span></label>
+        <input type="password" id="confirmPassword" placeholder="Repeat password" />
+        <div class="error-msg" id="err-confirmPassword">Passwords do not match.</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-prev" onclick="prevStep(2)">← Back</button>
+        <button class="btn btn-next" onclick="nextStep(2)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Preferences -->
+    <div class="step-panel" id="step3">
+      <div class="step-heading">Your Preferences</div>
+      <p class="step-desc">Customize your experience from the start.</p>
+
+      <div class="field-group">
+        <label>Account Type <span class="req">*</span></label>
+        <div class="radio-group" id="accountType">
+          <div class="radio-card">
+            <input type="radio" name="accType" id="personal" value="Personal" />
+            <label for="personal"><span class="icon">👤</span> Personal</label>
+          </div>
+          <div class="radio-card">
+            <input type="radio" name="accType" id="business" value="Business" />
+            <label for="business"><span class="icon">🏢</span> Business</label>
+          </div>
+          <div class="radio-card">
+            <input type="radio" name="accType" id="student" value="Student" />
+            <label for="student"><span class="icon">🎓</span> Student</label>
+          </div>
+          <div class="radio-card">
+            <input type="radio" name="accType" id="nonprofit" value="Non-Profit" />
+            <label for="nonprofit"><span class="icon">💚</span> Non-Profit</label>
+          </div>
+        </div>
+        <div class="error-msg" id="err-accountType">Please select an account type.</div>
+      </div>
+
+      <div class="field-group">
+        <label for="country">Country <span class="req">*</span></label>
+        <select id="country">
+          <option value="">-- Select Country --</option>
+          <option value="Pakistan">Pakistan</option>
+          <option value="India">India</option>
+          <option value="United States">United States</option>
+          <option value="United Kingdom">United Kingdom</option>
+          <option value="Canada">Canada</option>
+          <option value="Australia">Australia</option>
+          <option value="Germany">Germany</option>
+          <option value="Other">Other</option>
+        </select>
+        <div class="error-msg" id="err-country">Please select your country.</div>
+      </div>
+
+      <div class="field-group">
+        <label for="bio">Short Bio</label>
+        <textarea id="bio" placeholder="Tell us something interesting about yourself..."></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-prev" onclick="prevStep(3)">← Back</button>
+        <button class="btn btn-next" onclick="nextStep(3)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Review -->
+    <div class="step-panel" id="step4">
+      <div class="step-heading">Review & Submit</div>
+      <p class="step-desc">Check everything looks right before submitting.</p>
+
+      <div class="summary-block">
+        <h4>Personal Info</h4>
+        <div class="summary-row"><span>Name</span><span id="s-name">—</span></div>
+        <div class="summary-row"><span>Email</span><span id="s-email">—</span></div>
+        <div class="summary-row"><span>Phone</span><span id="s-phone">—</span></div>
+        <div class="summary-row"><span>Date of Birth</span><span id="s-dob">—</span></div>
+      </div>
+
+      <div class="summary-block">
+        <h4>Account</h4>
+        <div class="summary-row"><span>Username</span><span id="s-username">—</span></div>
+        <div class="summary-row"><span>Password</span><span id="s-password">••••••••</span></div>
+      </div>
+
+      <div class="summary-block">
+        <h4>Preferences</h4>
+        <div class="summary-row"><span>Account Type</span><span id="s-acctype">—</span></div>
+        <div class="summary-row"><span>Country</span><span id="s-country">—</span></div>
+        <div class="summary-row"><span>Bio</span><span id="s-bio">—</span></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-prev" onclick="prevStep(4)">← Back</button>
+      </div>
+      <button class="btn btn-submit" onclick="submitForm()">🚀 Submit Registration</button>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="success-screen" id="successScreen">
+      <div class="success-icon">🎉</div>
+      <h2>You're all set!</h2>
+      <p>Your account has been created successfully.<br>Welcome aboard!</p>
+      <button class="btn-restart" onclick="restartForm()">Start Over</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentStep = 1;
+  const totalSteps = 4;
+  const SAVE_KEY = 'msf_autosave';
+
+  // ── AUTOSAVE ──────────────────────────────────────────────────
+  function saveData() {
+    const data = {
+      firstName: v('firstName'), lastName: v('lastName'),
+      email: v('email'), phone: v('phone'), dob: v('dob'),
+      username: v('username'),
+      accountType: getRadio(),
+      country: v('country'), bio: v('bio')
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    showAutosave();
+  }
+
+  function loadData() {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    set('firstName', d.firstName); set('lastName', d.lastName);
+    set('email', d.email); set('phone', d.phone); set('dob', d.dob);
+    set('username', d.username);
+    set('country', d.country); set('bio', d.bio);
+    if (d.accountType) {
+      const r = document.querySelector(`input[name="accType"][value="${d.accountType}"]`);
+      if (r) r.checked = true;
+    }
+  }
+
+  function showAutosave() {
+    const badge = document.getElementById('autosaveBadge');
+    badge.classList.add('show');
+    setTimeout(() => badge.classList.remove('show'), 2000);
+  }
+
+  // ── HELPERS ──────────────────────────────────────────────────
+  function v(id) { return document.getElementById(id)?.value.trim() || ''; }
+  function set(id, val) { if (document.getElementById(id)) document.getElementById(id).value = val || ''; }
+  function getRadio() {
+    const r = document.querySelector('input[name="accType"]:checked');
+    return r ? r.value : '';
+  }
+
+  function showError(id, show) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (show) el.classList.add('show');
+    else el.classList.remove('show');
+  }
+
+  function markField(id, error) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (error) el.classList.add('error');
+    else el.classList.remove('error');
+  }
+
+  // ── VALIDATION ───────────────────────────────────────────────
+  function validateStep(step) {
+    let ok = true;
+
+    if (step === 1) {
+      const fn = v('firstName'), ln = v('lastName'), em = v('email'), dob = v('dob');
+      [['firstName', !fn], ['lastName', !ln],
+       ['email', !em || !/^[^@]+@[^@]+\.[^@]+$/.test(em)],
+       ['dob', !dob]
+      ].forEach(([id, err]) => { markField(id, err); showError('err-'+id, err); if (err) ok = false; });
+    }
+
+    if (step === 2) {
+      const usr = v('username'), pwd = v('password'), cpwd = v('confirmPassword');
+      const uErr = usr.length < 4, pErr = pwd.length < 8, cErr = pwd !== cpwd || !cpwd;
+      [['username', uErr], ['password', pErr], ['confirmPassword', cErr]]
+        .forEach(([id, err]) => { markField(id, err); showError('err-'+id, err); if (err) ok = false; });
+    }
+
+    if (step === 3) {
+      const at = getRadio(), cnt = v('country');
+      const atErr = !at, cErr = !cnt;
+      showError('err-accountType', atErr); if (atErr) ok = false;
+      markField('country', cErr); showError('err-country', cErr); if (cErr) ok = false;
+    }
+
+    return ok;
+  }
+
+  // ── NAVIGATION ───────────────────────────────────────────────
+  function nextStep(from) {
+    if (!validateStep(from)) return;
+    saveData();
+    if (from === 3) fillSummary();
+    goTo(from + 1, false);
+  }
+
+  function prevStep(from) {
+    goTo(from - 1, true);
+  }
+
+  function goTo(step, back) {
+    document.getElementById('step' + currentStep).classList.remove('active');
+    currentStep = step;
+    const panel = document.getElementById('step' + currentStep);
+    panel.classList.remove('slide-back');
+    void panel.offsetWidth; // reflow
+    if (back) panel.classList.add('slide-back');
+    panel.classList.add('active');
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const dots = document.querySelectorAll('.step-dot');
+    dots.forEach((dot, i) => {
+      const s = i + 1;
+      dot.classList.remove('done', 'active');
+      if (s < currentStep) dot.classList.add('done');
+      else if (s === currentStep) dot.classList.add('active');
+    });
+
+    // progress line
+    const pct = ((currentStep - 1) / (totalSteps - 1)) * 100;
+    document.getElementById('progressFill').style.width = `calc(${pct}% * (100% - 40px) / 100% + 20px)`;
+
+    // simpler approach: just set width as percentage of the track minus the dot ends
+    const fill = document.getElementById('progressFill');
+    const track = document.getElementById('progressTrack');
+    const trackW = track.offsetWidth - 40; // minus 20px left + 20px right
+    fill.style.width = (20 + (trackW * (currentStep - 1) / (totalSteps - 1))) + 'px';
+  }
+
+  // ── SUMMARY ──────────────────────────────────────────────────
+  function fillSummary() {
+    const fullName = [v('firstName'), v('lastName')].filter(Boolean).join(' ') || '—';
+    document.getElementById('s-name').textContent = fullName;
+    document.getElementById('s-email').textContent = v('email') || '—';
+    document.getElementById('s-phone').textContent = v('phone') || '—';
+    document.getElementById('s-dob').textContent = v('dob') || '—';
+    document.getElementById('s-username').textContent = v('username') || '—';
+    document.getElementById('s-acctype').textContent = getRadio() || '—';
+    document.getElementById('s-country').textContent = v('country') || '—';
+    const bio = v('bio');
+    document.getElementById('s-bio').textContent = bio ? (bio.length > 40 ? bio.slice(0, 40) + '…' : bio) : '—';
+  }
+
+  // ── SUBMIT ───────────────────────────────────────────────────
+  function submitForm() {
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('progressTrack').style.display = 'none';
+    document.getElementById('successScreen').classList.add('show');
+    localStorage.removeItem(SAVE_KEY);
+  }
+
+  function restartForm() {
+    location.reload();
+  }
+
+  // ── PASSWORD STRENGTH ────────────────────────────────────────
+  function checkStrength(pwd) {
+    const bars = [1,2,3,4].map(i => document.getElementById('sb'+i));
+    const label = document.getElementById('strengthLabel');
+    bars.forEach(b => { b.className = 'strength-bar'; });
+
+    if (!pwd) { label.textContent = 'Enter a password'; return; }
+
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+    const map = ['', 'weak', 'weak', 'medium', 'strong'];
+    const labels = ['', 'Too weak', 'Could be stronger', 'Getting there', 'Strong password!'];
+
+    for (let i = 0; i < score; i++) bars[i].classList.add(map[score]);
+    label.textContent = labels[score];
+    label.style.color = score <= 2 ? '#e74c3c' : score === 3 ? '#f39c12' : 'var(--accent)';
+  }
+
+  // ── AUTOSAVE ON INPUT ────────────────────────────────────────
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('input', () => saveData());
+    el.addEventListener('change', () => saveData());
+  });
+
+  // ── INIT ─────────────────────────────────────────────────────
+  loadData();
+  updateProgress();
+</script>
+</body>
+</html>
